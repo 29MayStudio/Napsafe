@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Map marker icon layered beautifully over the launcher -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,18C41.3,18 31,28.3 31,41C31,58.3 54,85.5 54,85.5C54,85.5 77,58.3 77,41C77,28.3 66.7,18 54,18ZM54,52.2C47.8,52.2 42.8,47.2 42.8,41C42.8,34.8 47.8,29.8 54,29.8C60.2,29.8 65.2,34.8 65.2,41C65.2,47.2 60.2,52.2 54,52.2Z" />
+</vector>

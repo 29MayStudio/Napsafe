@@ -3,175 +3,209 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface">
 
-    <!-- Map View (Google Maps SupportMapFragment) -->
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/map"
-        android:name="com.google.android.gms.maps.SupportMapFragment"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/controlPanel" />
-
-    <!-- Floating Search Bar Card -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/searchCard"
+    <!-- 1. Search Bar Container (On Top) -->
+    <LinearLayout
+        android:id="@+id/searchContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="6dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:background="?attr/colorSurface"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilSearch"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            app:boxCornerRadiusTopStart="24dp"
+            app:boxCornerRadiusTopEnd="24dp"
+            app:boxCornerRadiusBottomStart="24dp"
+            app:boxCornerRadiusBottomEnd="24dp"
+            app:hintEnabled="false">
+
+            <androidx.appcompat.widget.AppCompatAutoCompleteTextView
+                android:id="@+id/etSearch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Search destination..."
+                android:inputType="text"
+                android:maxLines="1"
+                android:imeOptions="actionSearch"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif"
+                android:textColor="?attr/colorOnSurface"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:completionThreshold="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <ImageButton
+            android:id="@+id/btnSearch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_search"
+            app:tint="?attr/colorOnSurface"
+            android:contentDescription="Search" />
+    </LinearLayout>
+
+    <!-- 2. Map Container (In the Middle) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/mapContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/searchContainer"
+        app:layout_constraintBottom_toTopOf="@id/controlPanel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/map"
+            android:name="com.google.android.gms.maps.SupportMapFragment"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Floating action button to relocate myself -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabMyLocation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:contentDescription="Relocate to my location"
+            app:srcCompat="@android:drawable/ic_menu_mylocation"
+            app:fabSize="normal"
+            app:backgroundTint="?attr/colorSurface"
+            app:tint="?attr/colorPrimary"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 3. Configuration Area (At the Bottom - plain on surface style) -->
+    <LinearLayout
+        android:id="@+id/controlPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:background="?attr/colorSurface"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tvAppName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="NapSafe"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="?attr/colorPrimary"
+            android:gravity="center_horizontal"
+            android:layout_marginBottom="12dp"/>
+
+        <!-- Status Info -->
+        <TextView
+            android:id="@+id/tvDestinationStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvDistanceRemaining"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/distance_to_dest"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="?attr/colorOnSurface"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Custom Radius Selection Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Alarm Radius (meters)"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginBottom="6dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
+            android:layout_marginBottom="20dp">
 
-            <EditText
-                android:id="@+id/etSearch"
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilRadius"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:background="@null"
-                android:hint="Search location..."
-                android:inputType="text"
-                android:maxLines="1"
-                android:imeOptions="actionSearch"
-                android:textSize="16sp"
-                android:fontFamily="sans-serif"
-                android:textColor="#333333" />
-
-            <ImageButton
-                android:id="@+id/btnSearch"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_search"
-                android:contentDescription="Search" />
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
-
-    <!-- Control Panel Card -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/controlPanel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="20dp">
-
-            <!-- Title -->
-            <TextView
-                android:id="@+id/tvAppName"
-                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="NapSafe"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                android:fontFamily="sans-serif-medium"
-                android:textColor="?attr/colorPrimary"
-                android:gravity="center_horizontal"
-                android:layout_marginBottom="12dp"/>
+                android:layout_weight="1.2"
+                app:hintEnabled="false">
 
-            <!-- Status Info -->
-            <TextView
-                android:id="@+id/tvDestinationStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/destination_not_set"
-                android:textSize="14sp"
-                android:fontFamily="sans-serif"
-                android:textColor="#555555"
-                android:layout_marginBottom="6dp" />
-
-            <TextView
-                android:id="@+id/tvDistanceRemaining"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/distance_to_dest"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:fontFamily="sans-serif-medium"
-                android:textColor="#333333"
-                android:layout_marginBottom="16dp" />
-
-            <!-- Custom Radius Selection Section -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Alarm Radius"
-                android:textSize="12sp"
-                android:fontFamily="sans-serif"
-                android:textColor="#777777"
-                android:layout_marginBottom="6dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="20dp">
-
-                <EditText
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etRadius"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1.2"
-                    android:hint="Radius in meters (e.g. 500)"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Radius (e.g. 500)"
                     android:inputType="number"
                     android:maxLength="6"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif"
-                    android:textColor="#333333"
-                    android:background="@android:drawable/edit_text"
+                    android:textColor="?attr/colorOnSurface"
                     android:paddingStart="12dp"
-                    android:paddingEnd="12dp" />
+                    android:paddingEnd="12dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-                <View
-                    android:layout_width="12dp"
-                    android:layout_height="1dp" />
+            <View
+                android:layout_width="12dp"
+                android:layout_height="1dp" />
 
-                <Button
-                    android:id="@+id/btnPreset1km"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="0.8"
-                    android:text="1km Preset"
-                    android:textSize="12sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:padding="0dp" />
-            </LinearLayout>
-
-            <!-- Start / Stop Button -->
             <Button
-                android:id="@+id/btnStartStop"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:text="@string/start_journey"
-                android:textSize="16sp"
+                android:id="@+id/btnPreset1km"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="0.8"
+                android:text="1km Preset"
+                android:textSize="12sp"
                 android:fontFamily="sans-serif-medium"
-                app:cornerRadius="16dp" />
-
+                android:padding="0dp" />
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
+
+        <!-- Start / Stop Button -->
+        <Button
+            android:id="@+id/btnStartStop"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/start_journey"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            app:cornerRadius="16dp" />
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

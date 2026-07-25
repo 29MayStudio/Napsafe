@@ -13,7 +13,7 @@
         android:id="@+id/ivAlarmIcon"
         android:layout_width="128dp"
         android:layout_height="128dp"
-        android:src="@android:drawable/ic_lock_idle_alarm"
+        android:src="@drawable/ic_alarm_alert"
         android:contentDescription="Alarm Icon"
         android:layout_marginBottom="24dp"
         app:tint="@android:color/white" />
