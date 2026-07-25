@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:ignore="MergeRootFrame">
+
+    <!-- Map View -->
+    <org.osmdroid.views.MapView
+        android:id="@+id/mapView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/controlPanel" />
+
+    <!-- Control Panel -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/controlPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tvAppName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="NapSafe"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:gravity="center_horizontal"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/tvDestinationStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/destination_not_set"
+                android:textSize="14sp"
+                android:textColor="#555555"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/tvDistanceRemaining"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/distance_to_dest"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/select_radius"
+                android:textSize="12sp"
+                android:textColor="#777777"
+                android:layout_marginBottom="4dp" />
+
+            <!-- Radius Selection RadioGroup -->
+            <RadioGroup
+                android:id="@+id/rgRadius"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="16dp">
+
+                <RadioButton
+                    android:id="@+id/rbRadius500"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:text="500m" />
+
+                <RadioButton
+                    android:id="@+id/rbRadius1000"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="1km" />
+
+                <RadioButton
+                    android:id="@+id/rbRadius2000"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="2km" />
+            </RadioGroup>
+
+            <!-- Start / Stop Button -->
+            <Button
+                android:id="@+id/btnStartStop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/start_journey"
+                android:textSize="16sp"
+                android:padding="12dp" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
