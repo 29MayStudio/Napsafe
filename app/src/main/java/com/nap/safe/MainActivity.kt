@@ -8,8 +8,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,7 +21,13 @@ import androidx.core.content.ContextCompat
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import android.location.Address
+import android.view.View
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -27,6 +35,8 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.Polyline
+import com.google.android.gms.maps.model.PolylineOptions
 import com.nap.safe.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -34,6 +44,60 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var binding: ActivityMainBinding
     private var googleMap: GoogleMap? = null
     private var destinationMarker: Marker? = null
+    private var routePolyline: Polyline? = null
+    private var lastUserLatLng: LatLng? = null
+
+    private val fusedLocationClient by lazy {
+        LocationServices.getFusedLocationProviderClient(this)
+    }
+
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            val location = locationResult.lastLocation ?: return
+            val userLatLng = LatLng(location.latitude, location.longitude)
+            lastUserLatLng = userLatLng
+
+            // Draw / update path to the destination
+            drawPathToDestination()
+
+            // Calculate and update distance dynamically
+            val destLat = preferences.getFloat("dest_lat", Float.NaN)
+            val destLng = preferences.getFloat("dest_lng", Float.NaN)
+            if (!destLat.isNaN() && !destLng.isNaN()) {
+                val dest = Location("dest").apply {
+                    latitude = destLat.toDouble()
+                    longitude = destLng.toDouble()
+                }
+                updateDistanceUi(location.distanceTo(dest))
+            }
+        }
+    }
+
+    private fun checkBatteryOptimizations() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+            AlertDialog.Builder(this)
+                .setTitle("Unrestricted Battery Usage Required")
+                .setMessage("To ensure the alarm works perfectly even when your device goes into sleep (doze mode), please disable battery optimization for NapSafe.")
+                .setPositiveButton("Configure") { _, _ ->
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        try {
+                            val intent = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            startActivity(intent)
+                        } catch (ex: Exception) {
+                            Toast.makeText(this, "Could not open settings. Please disable battery optimization manually.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .setNegativeButton("Not Now", null)
+                .show()
+        }
+    }
 
     private val preferences by lazy {
         getSharedPreferences("napsafe_prefs", Context.MODE_PRIVATE)
@@ -81,6 +145,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         restoreJourneyState()
 
         checkAndRequestPermissions()
+        checkBatteryOptimizations()
     }
 
     override fun onResume() {
@@ -95,11 +160,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         if (lastDistance >= 0) {
             updateDistanceUi(lastDistance)
         }
+        startLocationUpdates()
     }
 
     override fun onPause() {
         super.onPause()
         unregisterReceiver(distanceReceiver)
+        stopLocationUpdates()
     }
 
     private fun setupMap() {
@@ -124,6 +191,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             // Default to a central point (London or similar) until real location is fetched
             val startPoint = LatLng(51.5074, -0.1278)
             map.moveCamera(CameraUpdateFactory.newLatLngZoom(startPoint, 15f))
+            binding.tvDestinationStatus.visibility = View.GONE
         }
 
         // Add map click listener
@@ -138,8 +206,61 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             map.isMyLocationEnabled = true
-            map.uiSettings.isMyLocationButtonEnabled = true
+            map.uiSettings.isMyLocationButtonEnabled = false // Disabled default since we use our own custom fabMyLocation button
+
+            // Fetch initial user location to draw path
+            fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+                if (loc != null) {
+                    val userLatLng = LatLng(loc.latitude, loc.longitude)
+                    lastUserLatLng = userLatLng
+                    drawPathToDestination()
+                }
+            }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startLocationUpdates() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+            val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L)
+                .setMinUpdateIntervalMillis(2000L)
+                .build()
+
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, mainLooper)
+        }
+    }
+
+    private fun stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+
+    private fun drawPathToDestination() {
+        val map = googleMap ?: return
+        val userLatLng = lastUserLatLng ?: return
+
+        val destLat = preferences.getFloat("dest_lat", Float.NaN)
+        val destLng = preferences.getFloat("dest_lng", Float.NaN)
+        if (destLat.isNaN() || destLng.isNaN()) {
+            routePolyline?.remove()
+            routePolyline = null
+            return
+        }
+
+        val destLatLng = LatLng(destLat.toDouble(), destLng.toDouble())
+
+        // Remove existing polyline if any
+        routePolyline?.remove()
+
+        // Draw the path to the destination
+        val polylineOptions = PolylineOptions()
+            .add(userLatLng)
+            .add(destLatLng)
+            .color(ContextCompat.getColor(this, R.color.purple_500))
+            .width(10f)
+
+        routePolyline = map.addPolyline(polylineOptions)
     }
 
     private fun checkAndRequestPermissions() {
@@ -198,11 +319,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             apply()
         }
 
-        binding.tvDestinationStatus.text = "Destination: Selected (${"%.4f".format(point.latitude)}, ${"%.4f".format(point.longitude)})"
+        // Only show the selected location text now that it is selected
+        binding.tvDestinationStatus.visibility = View.VISIBLE
+        binding.tvDestinationStatus.text = "Selected Destination: (${"%.4f".format(point.latitude)}, ${"%.4f".format(point.longitude)})"
+
+        // Redraw route polyline immediately
+        drawPathToDestination()
 
         // Calculate initial distance to destination if possible
         try {
-            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
             fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
                 if (loc != null) {
                     val dest = Location("dest").apply {
@@ -227,7 +352,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.tvDistanceRemaining.text = "Distance: $formatted"
     }
 
+    @SuppressLint("MissingPermission")
     private fun setupListeners() {
+        // Set up custom suggestions adapter for AutoCompleteTextView search bar
+        val suggestionsAdapter = GeocoderSuggestionsAdapter(this)
+        binding.etSearch.setAdapter(suggestionsAdapter)
+        binding.etSearch.setOnItemClickListener { parent, _, position, _ ->
+            val selectedAddress = parent.getItemAtPosition(position) as? Address
+            if (selectedAddress != null) {
+                val latLng = LatLng(selectedAddress.latitude, selectedAddress.longitude)
+                googleMap?.let { map ->
+                    map.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
+                    setDestination(latLng)
+                }
+            }
+        }
+
         binding.btnStartStop.setOnClickListener {
             val isJourneyActive = preferences.getBoolean("journey_active", false)
             if (isJourneyActive) {
@@ -264,6 +404,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 true
             } else {
                 false
+            }
+        }
+
+        // Setup the Custom Relocate Button (fabMyLocation)
+        binding.fabMyLocation.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        val currentLatLng = LatLng(loc.latitude, loc.longitude)
+                        lastUserLatLng = currentLatLng
+                        googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
+                        drawPathToDestination()
+                    } else {
+                        Toast.makeText(this, "Searching for location...", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                Toast.makeText(this, "Location permission is not granted.", Toast.LENGTH_SHORT).show()
             }
         }
     }
