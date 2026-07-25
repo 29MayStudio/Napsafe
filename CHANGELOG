@@ -1,0 +1,17 @@
+# Changelog
+
+All notable changes to NapSafe will be documented in this file.
+
+## [1.0.0] - 2024-12-18
+
+### Added
+- **Interactive Maps**: Full interactive maps integration powered by Google Maps with custom point-and-tap destination configuration.
+- **Search & AutoComplete**: Integrated with system `Geocoder` to fetch real-time address results dynamically on the search bar.
+- **Dynamic Routing**: Real-time updating path (`Polyline`) directly to selected destination from live location.
+- **Background Resiliency**: Background tracking powered by Kotlin Coroutines, `WorkManager` API chains, and foreground service capabilities to bypass system limitations.
+- **Doze Mode Exception**: Unrestricted battery exception dialog launcher to guarantee service wakefulness in sleep mode.
+- **Material You Design**: Fully configured Material You dynamic theme that adapts to user's current Android system theme palette.
+- **High-Resolution Alarm**: Full-screen overlay alert screen with wake-locks and vector alarm bell icon when user reaches destination.
+
+### Optimized
+- **Landscape Layout**: Created orientation-specific layout (`activity_main.xml` under `layout-land/`) to prevent confirmation panel from covering the entire screen. The map area stays cleanly on the left 55% of the screen while the search bar and scrollable configuration panel occupy the right 45% of the screen.
