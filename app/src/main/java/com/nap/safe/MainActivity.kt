@@ -8,11 +8,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.preference.PreferenceManager
-import android.provider.Settings
+import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -22,21 +20,20 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import com.nap.safe.databinding.ActivityMainBinding
-import org.osmdroid.config.Configuration
-import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var binding: ActivityMainBinding
+    private var googleMap: GoogleMap? = null
     private var destinationMarker: Marker? = null
-    private var myLocationOverlay: MyLocationNewOverlay? = null
 
     private val preferences by lazy {
         getSharedPreferences("napsafe_prefs", Context.MODE_PRIVATE)
@@ -76,11 +73,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize OSMDroid Configuration
-        val ctx = applicationContext
-        Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
-        Configuration.getInstance().userAgentValue = "com.nap.safe"
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -93,7 +85,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        binding.mapView.onResume()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(distanceReceiver, IntentFilter("com.nap.safe.UPDATE_DISTANCE"), Context.RECEIVER_EXPORTED)
         } else {
@@ -108,45 +99,47 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        binding.mapView.onPause()
         unregisterReceiver(distanceReceiver)
     }
 
     private fun setupMap() {
-        binding.mapView.setTileSource(TileSourceFactory.MAPNIK)
-        binding.mapView.setMultiTouchControls(true)
-        val mapController = binding.mapView.controller
-        mapController.setZoom(15.0)
-
-        // Default to a central point (London or similar) until real location is fetched
-        val startPoint = GeoPoint(51.5074, -0.1278)
-        mapController.setCenter(startPoint)
-
-        // Add Tap listener to place destination marker
-        val mapEventsReceiver = object : MapEventsReceiver {
-            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
-                if (p != null) {
-                    setDestination(p)
-                }
-                return true
-            }
-
-            override fun longPressHelper(p: GeoPoint?): Boolean {
-                return false
-            }
-        }
-
-        val eventsOverlay = MapEventsOverlay(mapEventsReceiver)
-        binding.mapView.overlays.add(eventsOverlay)
+        val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+        mapFragment.getMapAsync(this)
     }
 
-    private fun initMyLocation() {
-        val provider = GpsMyLocationProvider(this)
-        myLocationOverlay = MyLocationNewOverlay(provider, binding.mapView).apply {
-            enableMyLocation()
-            enableFollowLocation()
+    override fun onMapReady(map: GoogleMap) {
+        googleMap = map
+        map.uiSettings.isZoomControlsEnabled = true
+
+        initMyLocation()
+
+        // Restore destination marker
+        val destLat = preferences.getFloat("dest_lat", Float.NaN)
+        val destLng = preferences.getFloat("dest_lng", Float.NaN)
+        if (!destLat.isNaN() && !destLng.isNaN()) {
+            val point = LatLng(destLat.toDouble(), destLng.toDouble())
+            setDestination(point)
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(point, 15f))
+        } else {
+            // Default to a central point (London or similar) until real location is fetched
+            val startPoint = LatLng(51.5074, -0.1278)
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(startPoint, 15f))
         }
-        binding.mapView.overlays.add(myLocationOverlay)
+
+        // Add map click listener
+        map.setOnMapClickListener { point ->
+            setDestination(point)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun initMyLocation() {
+        val map = googleMap ?: return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            map.isMyLocationEnabled = true
+            map.uiSettings.isMyLocationButtonEnabled = true
+        }
     }
 
     private fun checkAndRequestPermissions() {
@@ -190,17 +183,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setDestination(point: GeoPoint) {
-        if (destinationMarker == null) {
-            destinationMarker = Marker(binding.mapView).apply {
-                title = "Destination"
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            }
-            binding.mapView.overlays.add(destinationMarker)
-        }
-
-        destinationMarker?.position = point
-        binding.mapView.invalidate()
+    private fun setDestination(point: LatLng) {
+        val map = googleMap ?: return
+        destinationMarker?.remove()
+        destinationMarker = map.addMarker(
+            MarkerOptions()
+                .position(point)
+                .title("Destination")
+        )
 
         preferences.edit().apply {
             putFloat("dest_lat", point.latitude.toFloat())
@@ -247,15 +237,73 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.rgRadius.setOnCheckedChangeListener { _, checkedId ->
-            val radius = when (checkedId) {
-                R.id.rbRadius500 -> 500f
-                R.id.rbRadius1000 -> 1000f
-                R.id.rbRadius2000 -> 2000f
-                else -> 500f
-            }
-            preferences.edit().putFloat("alert_radius", radius).apply()
+        binding.btnPreset1km.setOnClickListener {
+            binding.etRadius.setText("1000")
+            preferences.edit().putFloat("alert_radius", 1000f).apply()
         }
+
+        binding.etRadius.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val radiusStr = s?.toString()?.trim() ?: ""
+                val radius = radiusStr.toFloatOrNull()
+                if (radius != null && radius > 0f) {
+                    preferences.edit().putFloat("alert_radius", radius).apply()
+                }
+            }
+        })
+
+        binding.btnSearch.setOnClickListener {
+            performSearch()
+        }
+
+        binding.etSearch.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                performSearch()
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun performSearch() {
+        val query = binding.etSearch.text.toString().trim()
+        if (query.isEmpty()) return
+
+        // Hide keyboard
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        imm?.hideSoftInputFromWindow(binding.etSearch.windowToken, 0)
+
+        // Run geocoding in a background thread
+        Thread {
+            try {
+                @Suppress("DEPRECATION")
+                val geocoder = android.location.Geocoder(this)
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocationName(query, 1)
+                if (addresses != null && addresses.isNotEmpty()) {
+                    val address = addresses[0]
+                    val latLng = LatLng(address.latitude, address.longitude)
+                    runOnUiThread {
+                        googleMap?.let { map ->
+                            map.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
+                            setDestination(latLng)
+                        }
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this, "Location not found.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                runOnUiThread {
+                    Toast.makeText(this, "Search error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 
     private fun startJourney() {
@@ -267,12 +315,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Get and save radius
-        val radius = when (binding.rgRadius.checkedRadioButtonId) {
-            R.id.rbRadius500 -> 500f
-            R.id.rbRadius1000 -> 1000f
-            R.id.rbRadius2000 -> 2000f
-            else -> 500f
+        val radiusStr = binding.etRadius.text.toString().trim()
+        val radius = radiusStr.toFloatOrNull()
+        if (radius == null || radius <= 0f) {
+            Toast.makeText(this, "Please enter a valid positive alarm radius.", Toast.LENGTH_SHORT).show()
+            return
         }
 
         preferences.edit().apply {
@@ -296,28 +343,19 @@ class MainActivity : AppCompatActivity() {
     private fun stopJourney() {
         preferences.edit().putBoolean("journey_active", false).apply()
         WorkManager.getInstance(this).cancelUniqueWork("napsafe_periodic_check")
+        // Also cancel the notification to clean up immediately
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        notificationManager.cancel(LocationCheckWorker.NOTIFICATION_ID)
+
         updateUiState(false)
         Toast.makeText(this, "Journey stopped.", Toast.LENGTH_SHORT).show()
     }
 
     private fun restoreJourneyState() {
         val isJourneyActive = preferences.getBoolean("journey_active", false)
-        val destLat = preferences.getFloat("dest_lat", Float.NaN)
-        val destLng = preferences.getFloat("dest_lng", Float.NaN)
-        val alertRadius = preferences.getFloat("alert_radius", 500f)
+        val alertRadius = preferences.getFloat("alert_radius", 1000f)
 
-        // Restore destination marker
-        if (!destLat.isNaN() && !destLng.isNaN()) {
-            val point = GeoPoint(destLat.toDouble(), destLng.toDouble())
-            setDestination(point)
-        }
-
-        // Restore selected radius
-        when (alertRadius) {
-            500f -> binding.rbRadius500.isChecked = true
-            1000f -> binding.rbRadius1000.isChecked = true
-            2000f -> binding.rbRadius2000.isChecked = true
-        }
+        binding.etRadius.setText(alertRadius.toInt().toString())
 
         updateUiState(isJourneyActive)
     }
@@ -326,10 +364,14 @@ class MainActivity : AppCompatActivity() {
         if (isJourneyActive) {
             binding.btnStartStop.text = getString(R.string.stop_journey)
             binding.btnStartStop.backgroundTintList = ContextCompat.getColorStateList(this, R.color.red)
+            binding.etRadius.isEnabled = false
+            binding.btnPreset1km.isEnabled = false
         } else {
             binding.btnStartStop.text = getString(R.string.start_journey)
             binding.btnStartStop.backgroundTintList = ContextCompat.getColorStateList(this, R.color.purple_500)
             binding.tvDistanceRemaining.text = getString(R.string.distance_to_dest)
+            binding.etRadius.isEnabled = true
+            binding.btnPreset1km.isEnabled = true
         }
     }
 }

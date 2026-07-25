@@ -5,16 +5,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.RingtoneManager
+import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import android.location.Location
-import android.location.LocationManager
-import android.os.SystemClock
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.tasks.Tasks
 import java.util.concurrent.TimeUnit
@@ -36,10 +33,18 @@ class LocationCheckWorker(
         // Create foreground notification to allow background operation in latest Android
         createNotificationChannel()
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("NapSafe Journey Tracking")
+            .setContentTitle("NapSafe Journey Active")
             .setContentText("Checking your location in the background...")
             .setSmallIcon(android.R.drawable.ic_dialog_map)
             .setOngoing(true)
+            .setContentIntent(PendingIntent.getActivity(
+                context,
+                0,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            ))
             .build()
 
         // Set worker as foreground
@@ -62,15 +67,19 @@ class LocationCheckWorker(
         val isJourneyActive = prefs.getBoolean("journey_active", false)
         if (!isJourneyActive) {
             Log.d(TAG, "Journey is inactive. Stopping worker recurrence.")
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(NOTIFICATION_ID)
             return Result.success()
         }
 
         val destLat = prefs.getFloat("dest_lat", Float.NaN)
         val destLng = prefs.getFloat("dest_lng", Float.NaN)
-        val alertRadius = prefs.getFloat("alert_radius", 500f)
+        val alertRadius = prefs.getFloat("alert_radius", 1000f)
 
         if (destLat.isNaN() || destLng.isNaN()) {
             Log.e(TAG, "Destination coordinates not found or invalid.")
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(NOTIFICATION_ID)
             return Result.failure()
         }
 
@@ -78,6 +87,7 @@ class LocationCheckWorker(
         val currentLocation = getCurrentLocation()
         if (currentLocation == null) {
             Log.w(TAG, "Could not fetch current location. Retrying...")
+            updateNotification("Waiting for GPS location update...")
             scheduleNextCheck()
             return Result.success()
         }
@@ -101,6 +111,14 @@ class LocationCheckWorker(
             putExtra("distance", distance)
         }
         context.sendBroadcast(updateIntent)
+
+        // Update persistent notification with remaining distance
+        val formatted = if (distance >= 1000) {
+            "%.2f km remaining".format(distance / 1000f)
+        } else {
+            "%.0f meters remaining".format(distance)
+        }
+        updateNotification("Distance to destination: $formatted")
 
         if (distance <= alertRadius) {
             Log.d(TAG, "Destination range reached! Triggering alarm.")
@@ -160,11 +178,34 @@ class LocationCheckWorker(
         )
     }
 
+    private fun updateNotification(contentText: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle("NapSafe Journey Active")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_dialog_map)
+            .setOngoing(true)
+            .setContentIntent(PendingIntent.getActivity(
+                context,
+                0,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            ))
+            .build()
+        notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
     private fun triggerAlarm() {
         // Mark journey as inactive
         context.getSharedPreferences("napsafe_prefs", Context.MODE_PRIVATE).edit()
             .putBoolean("journey_active", false)
             .apply()
+
+        // Cancel tracking notification
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(NOTIFICATION_ID)
 
         // Launch AlarmActivity with flags to wake screen
         val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
