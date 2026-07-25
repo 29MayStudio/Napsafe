@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@color/red"
+    android:padding="24dp">
+
+    <!-- Icon or Warning Sign -->
+    <ImageView
+        android:id="@+id/ivAlarmIcon"
+        android:layout_width="128dp"
+        android:layout_height="128dp"
+        android:src="@android:drawable/ic_lock_idle_alarm"
+        android:contentDescription="Alarm Icon"
+        android:tint="@color/white"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Wake up Message -->
+    <TextView
+        android:id="@+id/tvAlarmTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="WAKE UP!"
+        android:textSize="36sp"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tvAlarmSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="You have arrived at your destination range!"
+        android:textSize="18sp"
+        android:textColor="@color/white"
+        android:gravity="center"
+        android:layout_marginBottom="48dp" />
+
+    <!-- Stop Alarm Button -->
+    <Button
+        android:id="@+id/btnStopAlarm"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="I'M AWAKE"
+        android:textColor="@color/red"
+        android:backgroundTint="@color/white"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:padding="16dp" />
+
+</LinearLayout>

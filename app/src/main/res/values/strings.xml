@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">NapSafe</string>
+    <string name="start_journey">Start Journey</string>
+    <string name="stop_journey">Stop Journey</string>
+    <string name="destination_not_set">Destination: Not selected (Tap on the map)</string>
+    <string name="destination_set">Destination: Selected</string>
+    <string name="select_radius">Select Alarm Radius</string>
+    <string name="distance_to_dest">Distance: --</string>
+</resources>
